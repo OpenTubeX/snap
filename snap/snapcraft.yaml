@@ -10,7 +10,7 @@ website: https://opentubex.org/
 contact: https://github.com/OpenTubeX/OpenTubeX/issues
 issues: https://github.com/OpenTubeX/OpenTubeX/issues
 source-code: https://github.com/OpenTubeX/snap
-license: AGPL-3.0+
+license: AGPL-3.0
 
 base: core24
 grade: stable
