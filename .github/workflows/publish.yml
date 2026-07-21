@@ -1,0 +1,113 @@
+name: Build and publish Snap
+
+on:
+  repository_dispatch:
+    types: [opentubex-release]
+  workflow_dispatch:
+    inputs:
+      releaseTag:
+        description: Release tag to package (for example, v0.29.0-beta)
+        required: false
+        type: string
+      publish:
+        description: Publish the built snaps to the Snap Store
+        required: true
+        default: false
+        type: boolean
+      channel:
+        description: Snap Store channel used when publishing
+        required: true
+        default: beta
+        type: choice
+        options:
+          - stable
+          - candidate
+          - beta
+          - edge
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snap-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }} Snap
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Resolve release version
+        id: release
+        shell: bash
+        env:
+          INPUT_TAG: ${{ github.event.client_payload.tag || inputs.releaseTag }}
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+
+          tag="$INPUT_TAG"
+          if [[ -z "$tag" ]]; then
+            tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
+          fi
+
+          if [[ ! "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
+            echo "Expected a tag like v0.29.0-beta, got: $tag" >&2
+            exit 1
+          fi
+
+          version="${BASH_REMATCH[1]}"
+          asset="opentubex_${version}_beta_${TARGET_ARCH}.deb"
+          if ! gh release view "$tag" --repo OpenTubeX/OpenTubeX \
+            --json assets --jq '.assets[].name' | grep --fixed-strings --line-regexp --quiet "$asset"; then
+            echo "Release $tag does not contain $asset" >&2
+            exit 1
+          fi
+
+          sed -i -E "s/^version:.*/version: ${version}/" snap/snapcraft.yaml
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build Snap
+        id: snapcraft
+        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
+
+      - name: Upload Snap artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: opentubex-${{ steps.release.outputs.version }}-${{ matrix.arch }}.snap
+          path: ${{ steps.snapcraft.outputs.snap }}
+
+      - name: Check Snap Store credentials
+        if: github.event_name == 'repository_dispatch' || inputs.publish
+        shell: bash
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          if [[ -z "$SNAPCRAFT_STORE_CREDENTIALS" ]]; then
+            echo "The SNAPCRAFT_STORE_CREDENTIALS repository secret is not configured" >&2
+            exit 1
+          fi
+
+      - name: Publish Snap
+        if: github.event_name == 'repository_dispatch' || inputs.publish
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.snapcraft.outputs.snap }}
+          release: ${{ inputs.channel || 'beta' }}

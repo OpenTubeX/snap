@@ -1,0 +1,67 @@
+name: opentubex
+title: OpenTubeX
+version: 0.29.0
+summary: A private YouTube client
+description: |
+  OpenTubeX is an open source desktop YouTube player built with privacy in
+  mind. Watch YouTube without advertisements and without Google tracking you
+  through cookies and JavaScript.
+website: https://opentubex.org/
+contact: https://github.com/OpenTubeX/OpenTubeX/issues
+issues: https://github.com/OpenTubeX/OpenTubeX/issues
+source-code: https://github.com/OpenTubeX/snap
+license: AGPL-3.0+
+
+base: core24
+grade: stable
+confinement: strict
+compression: lzo
+
+platforms:
+  amd64: {}
+  arm64: {}
+
+apps:
+  opentubex:
+    command: opt/OpenTubeX/opentubex --no-sandbox
+    common-id: io.opentubex.opentubex
+    desktop: usr/share/applications/opentubex.desktop
+    extensions: [gnome]
+    environment:
+      ELECTRON_OZONE_PLATFORM_HINT: auto
+    plugs:
+      - audio-playback
+      - browser-support
+      - home
+      - network
+      - network-bind
+      - network-status
+      - removable-media
+      - screen-inhibit-control
+      - unity7
+    slots:
+      - mpris
+
+slots:
+  mpris:
+    interface: mpris
+    name: chromium
+  opentubex:
+    interface: dbus
+    bus: session
+    name: io.opentubex.opentubex
+
+parts:
+  opentubex:
+    plugin: dump
+    source:
+      - on amd64: https://github.com/OpenTubeX/OpenTubeX/releases/download/v$SNAPCRAFT_PROJECT_VERSION-beta/opentubex_$SNAPCRAFT_PROJECT_VERSION_beta_amd64.deb
+      - on arm64: https://github.com/OpenTubeX/OpenTubeX/releases/download/v$SNAPCRAFT_PROJECT_VERSION-beta/opentubex_$SNAPCRAFT_PROJECT_VERSION_beta_arm64.deb
+    override-prime: |
+      craftctl default
+      sed -i \
+        's|^Icon=.*|Icon=${SNAP}/usr/share/icons/hicolor/scalable/apps/opentubex.svg|' \
+        usr/share/applications/opentubex.desktop
+    prime:
+      - -opt/*/chrome-sandbox
+      - -usr/share/doc
