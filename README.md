@@ -13,11 +13,18 @@ beta:
 sudo snap install opentubex --beta
 ```
 
+Development snapshots are published to the opt-in edge channel:
+
+```sh
+sudo snap install opentubex --edge
+```
+
 ## How publishing works
 
-After an OpenTubeX release finishes uploading its packages, the application
-repository sends an `opentubex-release` repository dispatch containing the
-release tag. The publish workflow then:
+After an OpenTubeX stable or nightly release finishes uploading its packages,
+the application repository sends a repository dispatch containing the exact
+release tag. Nightlies are always published to `edge`; stable releases retain
+the selected store channel. The publish workflow then:
 
 1. validates that the release contains the required `amd64` and `arm64`
    Debian packages;

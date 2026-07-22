@@ -2,7 +2,7 @@ name: Build and publish Snap
 
 on:
   repository_dispatch:
-    types: [opentubex-release]
+    types: [opentubex-release, opentubex-nightly]
   workflow_dispatch:
     inputs:
       releaseTag:
@@ -66,13 +66,20 @@ jobs:
             tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
           fi
 
-          if [[ ! "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
-            echo "Expected a tag like v0.29.0-beta, got: $tag" >&2
+          if [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
+            version="${BASH_REMATCH[1]}"
+            asset_version="${version}_beta"
+            channel="${{ inputs.channel || 'beta' }}"
+          elif [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
+            version="${BASH_REMATCH[1]}"
+            asset_version="$version"
+            channel=edge
+          else
+            echo "Expected a stable or nightly OpenTubeX tag, got: $tag" >&2
             exit 1
           fi
 
-          version="${BASH_REMATCH[1]}"
-          asset="opentubex_${version}_beta_${TARGET_ARCH}.deb"
+          asset="opentubex_${asset_version}_${TARGET_ARCH}.deb"
           if ! gh release view "$tag" --repo OpenTubeX/OpenTubeX \
             --json assets --jq '.assets[].name' | grep --fixed-strings --line-regexp --quiet "$asset"; then
             echo "Release $tag does not contain $asset" >&2
@@ -80,7 +87,16 @@ jobs:
           fi
 
           sed -i -E "s/^version:.*/version: ${version}/" snap/snapcraft.yaml
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          sed -i -E \
+            "s|on amd64: .*|on amd64: https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${asset_version}_amd64.deb|" \
+            snap/snapcraft.yaml
+          sed -i -E \
+            "s|on arm64: .*|on arm64: https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${asset_version}_arm64.deb|" \
+            snap/snapcraft.yaml
+          {
+            echo "version=$version"
+            echo "channel=$channel"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build Snap
         id: snapcraft
@@ -110,4 +126,4 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
           snap: ${{ steps.snapcraft.outputs.snap }}
-          release: ${{ inputs.channel || 'beta' }}
+          release: ${{ steps.release.outputs.channel }}
