@@ -70,6 +70,9 @@ jobs:
             version="${BASH_REMATCH[1]}"
             asset_version="${version}_beta"
             channel="${{ inputs.channel || 'beta' }}"
+            if [[ "${{ github.event.action }}" == opentubex-release ]]; then
+              channel=beta,edge
+            fi
           elif [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
             version="${BASH_REMATCH[1]}"
             asset_version="$version"
