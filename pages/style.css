@@ -1,0 +1,100 @@
+@import url("https://fonts.bunny.net/css?family=ibm-plex-mono:400,500|ibm-plex-sans:400,500,600|space-grotesk:500,600,700");
+
+:root {
+  color-scheme: dark;
+  --ink: #e6f4f1;
+  --teal: #54d5ca;
+  --mist: #0b1416;
+  --mist-2: #122022;
+  --surface: #142224;
+  --slate: #9db5b5;
+  --line: rgb(232 242 240 / 12%);
+  --code-bg: #071113;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --ink: #0b3d3e;
+    --teal: #147a70;
+    --mist: #e8f2f0;
+    --mist-2: #d5e8e4;
+    --surface: #fbfefd;
+    --slate: #3d5a5b;
+    --line: rgb(11 61 62 / 12%);
+    --code-bg: #0b3d3e;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(ellipse 80% 50% at 15% 10%, color-mix(in srgb, var(--teal) 14%, transparent), transparent 55%),
+    linear-gradient(165deg, var(--mist) 0%, var(--mist-2) 100%);
+  font-family: "IBM Plex Sans", sans-serif;
+  line-height: 1.7;
+}
+
+main {
+  width: min(45rem, calc(100% - 2rem));
+  margin-inline: auto;
+  padding: 3.5rem 0 4.5rem;
+}
+
+h1,
+h2 {
+  color: var(--ink);
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.03em;
+}
+
+h1 {
+  margin: 0 0 0.8rem;
+  font-size: clamp(2rem, 5vw, 2.65rem);
+}
+
+h2 {
+  margin: 2.8rem 0 0.65rem;
+  padding-top: 2.8rem;
+  border-top: 1px solid var(--line);
+  font-size: clamp(1.4rem, 4vw, 1.8rem);
+}
+
+p {
+  color: var(--slate);
+}
+
+a {
+  color: var(--teal);
+  text-underline-offset: 0.15em;
+}
+
+p code {
+  padding: 0.08em 0.32em;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--teal) 12%, var(--surface));
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+}
+
+pre {
+  max-width: 100%;
+  margin: 1rem 0 1.35rem;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  color: #e8f2f0;
+  background: var(--code-bg);
+  border: 1px solid color-mix(in srgb, var(--teal) 28%, transparent);
+  border-radius: 0.4rem;
+  box-shadow: 0 0.8rem 2.5rem rgb(0 0 0 / 10%);
+}
+
+code {
+  font-family: "IBM Plex Mono", monospace;
+}

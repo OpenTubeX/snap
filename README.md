@@ -6,18 +6,20 @@ and `arm64` systems.
 
 ## Install OpenTubeX
 
-The package is initially published to the beta channel while OpenTubeX is in
-beta:
+OpenTubeX is currently pending review for publication in the Snap Store. Until
+it is approved, download the package for your architecture from the
+[OpenTubeX Snap page](https://snap.opentubex.org/) or
+[GitHub Releases](https://github.com/OpenTubeX/snap/releases) and install it directly:
 
 ```sh
-sudo snap install opentubex --beta
+sudo snap install --dangerous ./opentubex_*.snap
 ```
 
-Development snapshots are published to the opt-in edge channel:
+Packages installed this way are not connected to the Snap Store and must be
+updated manually.
 
-```sh
-sudo snap install opentubex --edge
-```
+After Store approval, beta releases will be available from the beta channel
+and development snapshots from the opt-in edge channel.
 
 ## How publishing works
 
@@ -30,10 +32,12 @@ the selected store channel. The publish workflow then:
    Debian packages;
 2. updates the Snap version for that workflow run;
 3. builds both architectures using strict confinement and the Core 24 base;
-4. uploads the resulting packages to the Snap Store beta channel.
+4. attaches the resulting packages to a GitHub release;
+5. uploads the packages to the selected Snap Store channel once Store review
+   is complete.
 
-The workflow can also be run manually with a release tag. Manual runs can
-build downloadable artifacts without publishing them.
+The workflow can also be run manually with a release tag. Manual runs publish
+downloadable packages on GitHub without publishing them to the Snap Store.
 
 ## Maintainer setup
 
