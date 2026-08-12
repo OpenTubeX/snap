@@ -124,12 +124,27 @@ jobs:
 
       - name: Publish Snap
         if: github.event_name == 'repository_dispatch' || inputs.publish
-        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1.2.0
+        shell: bash
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-        with:
-          snap: ${{ steps.snapcraft.outputs.snap }}
-          release: ${{ steps.release.outputs.channel }}
+          SNAP: ${{ steps.snapcraft.outputs.snap }}
+          CHANNEL: ${{ steps.release.outputs.channel }}
+        run: |
+          set -o pipefail
+
+          output_file="$(mktemp)"
+          if snapcraft upload "$SNAP" --release "$CHANNEL" 2>&1 | tee "$output_file"; then
+            exit 0
+          fi
+
+          if grep --fixed-strings --quiet \
+            "Waiting for previous upload(s) to complete their review process." \
+            "$output_file"; then
+            echo "::warning::Snap upload is waiting for the previous upload's store review"
+            exit 0
+          fi
+
+          exit 1
 
   release:
     name: Publish GitHub release
