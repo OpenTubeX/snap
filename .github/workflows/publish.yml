@@ -213,9 +213,11 @@ jobs:
 
           notes="Snap packages for [OpenTubeX ${TAG}](https://github.com/OpenTubeX/OpenTubeX/releases/tag/${TAG}).
 
-          Download the package for your architecture and install it with:
+          Install with:
           \`\`\`bash
-          sudo snap install --dangerous ./opentubex_*.snap
+          sudo snap install --dangerous ./opentubex_${VERSION}_amd64.snap
+          # or for ARM64:
+          sudo snap install --dangerous ./opentubex_${VERSION}_arm64.snap
           \`\`\`
 
           Packages installed this way are not connected to the Snap Store and must be updated manually."
