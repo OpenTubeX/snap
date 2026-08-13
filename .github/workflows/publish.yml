@@ -91,10 +91,10 @@ jobs:
 
           sed -i -E "s/^version:.*/version: ${version}/" snap/snapcraft.yaml
           sed -i -E \
-            "s|on amd64: .*|on amd64: https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${asset_version}_amd64.deb|" \
+            "s|on amd64: https://github.com/OpenTubeX/OpenTubeX/releases/download/.*|on amd64: https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${asset_version}_amd64.deb|" \
             snap/snapcraft.yaml
           sed -i -E \
-            "s|on arm64: .*|on arm64: https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${asset_version}_arm64.deb|" \
+            "s|on arm64: https://github.com/OpenTubeX/OpenTubeX/releases/download/.*|on arm64: https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${asset_version}_arm64.deb|" \
             snap/snapcraft.yaml
           {
             echo "version=$version"
