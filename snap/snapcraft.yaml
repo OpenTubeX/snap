@@ -49,7 +49,6 @@ apps:
 slots:
   mpris:
     interface: mpris
-    name: chromium
   opentubex:
     interface: dbus
     bus: session
