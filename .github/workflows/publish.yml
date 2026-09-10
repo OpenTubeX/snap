@@ -211,9 +211,19 @@ jobs:
             exit 1
           fi
 
+          install_channel=beta
+          if [[ "$PRERELEASE" == true ]]; then
+            install_channel=edge
+          fi
+
           notes="Snap packages for [OpenTubeX ${TAG}](https://github.com/OpenTubeX/OpenTubeX/releases/tag/${TAG}).
 
-          Install with:
+          Install from the [Snap Store](https://snapcraft.io/opentubex) with automatic updates:
+          \`\`\`bash
+          sudo snap install opentubex --${install_channel}
+          \`\`\`
+
+          Or install a downloaded package manually:
           \`\`\`bash
           sudo snap install --dangerous ./opentubex_${VERSION}_amd64.snap
           # or for ARM64:
