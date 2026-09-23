@@ -83,8 +83,8 @@ jobs:
           fi
 
           asset="opentubex_${asset_version}_${TARGET_ARCH}.deb"
-          if ! gh release view "$tag" --repo OpenTubeX/OpenTubeX \
-            --json assets --jq '.assets[].name' | grep --fixed-strings --line-regexp --quiet "$asset"; then
+          if ! wget --spider --quiet \
+            "https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/${asset}"; then
             echo "Release $tag does not contain $asset" >&2
             exit 1
           fi
