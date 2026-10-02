@@ -51,6 +51,11 @@ The workflow can also be run manually with a release tag. Manual runs publish
 downloadable packages on GitHub. Enable the `publish` input to also publish to
 the Snap Store; regular releases use the selected channel and nightlies use `edge`.
 
+Rerunning a tag with an immutable GitHub release keeps its published packages
+after checking that both architecture assets are complete. Rebuilt packages can
+still be uploaded to the Snap Store. To replace the downloadable GitHub packages,
+publish a new release tag.
+
 ## Maintainer setup
 
 1. Log in with `snapcraft login` using an account with publishing access to

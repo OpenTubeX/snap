@@ -238,9 +238,25 @@ jobs:
               "$notes"
           fi
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
+          if release="$(gh api "repos/${GH_REPO}/releases/tags/${TAG}" 2>&1)"; then
+            if jq --exit-status '.immutable == true' <<< "$release" >/dev/null; then
+              assets=("${snaps[@]}")
+              for asset in "${assets[@]}"; do
+                if ! jq --exit-status --arg name "$asset" \
+                  'any(.assets[]; .name == $name and .state == "uploaded" and .size > 0)' \
+                  <<< "$release" >/dev/null; then
+                  echo "Immutable release $TAG is missing a complete $asset; publish a new tag." >&2
+                  exit 1
+                fi
+              done
+              echo "Keeping the published packages in immutable release $TAG."
+              exit 0
+            fi
             gh release upload "$TAG" "${snaps[@]}" --clobber
-          else
+            if jq --exit-status '.draft == true' <<< "$release" >/dev/null; then
+              gh release edit "$TAG" --draft=false
+            fi
+          elif [[ "$release" == *"(HTTP 404)"* ]]; then
             release_flags=()
             if [[ "$PRERELEASE" == true ]]; then
               release_flags+=(--prerelease)
@@ -249,4 +265,7 @@ jobs:
               --title "OpenTubeX ${VERSION} (Snap)" \
               "${release_flags[@]}" \
               --notes "$notes"
+          else
+            echo "$release" >&2
+            exit 1
           fi
