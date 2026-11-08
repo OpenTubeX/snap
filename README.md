@@ -40,16 +40,18 @@ the application repository sends a repository dispatch containing the exact
 release tag. Nightlies are published to `edge`; regular releases are published to both
 `beta` and `edge`. The publish workflow then:
 
-1. validates that the release contains the required `amd64` and `arm64`
-   Debian packages;
-2. updates the Snap version for that workflow run;
-3. builds both architectures using strict confinement and the Core 24 base;
-4. attaches the resulting packages to a GitHub release;
-5. uploads the packages to the selected Snap Store channels.
+1. downloads the release's `amd64` and `arm64` Debian packages and sets the
+   Snap version;
+2. builds both architectures using strict confinement and the Core 24 base;
+3. uploads both packages to the selected Snap Store channels once both builds
+   succeed. If the Snap Store holds a revision for manual review, it is not
+   released and the workflow fails;
+4. attaches regular-release packages to a GitHub release.
 
-The workflow can also be run manually with a release tag. Manual runs publish
-downloadable packages on GitHub. Enable the `publish` input to also publish to
-the Snap Store; regular releases use the selected channel and nightlies use `edge`.
+The workflow can also be run manually with a release tag. Manual runs attach
+regular-release packages to a GitHub release and keep both builds as workflow
+artifacts. Enable the `publish` input to also publish to the Snap Store; regular
+releases use the selected channel and nightlies use `edge`.
 
 Rerunning a tag with an immutable GitHub release keeps its published packages
 after checking that both architecture assets are complete. Rebuilt packages can

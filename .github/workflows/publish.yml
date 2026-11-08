@@ -28,36 +28,32 @@ on:
 permissions:
   contents: read
 
+# Queue every run so a pending release is never replaced by a later one.
 concurrency:
   group: snap-publish
-  cancel-in-progress: false
+  queue: max
 
 jobs:
-  build:
-    name: Build ${{ matrix.arch }} Snap
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-latest
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
-    env:
-      GH_TOKEN: ${{ github.token }}
+  resolve:
+    name: Resolve release
+    runs-on: ubuntu-latest
+
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      asset_version: ${{ steps.release.outputs.asset_version }}
+      channel: ${{ steps.release.outputs.channel }}
+      stable: ${{ steps.release.outputs.stable }}
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Resolve release version
+      - name: Resolve release
         id: release
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           INPUT_TAG: ${{ github.event.client_payload.tag || inputs.releaseTag }}
-          TARGET_ARCH: ${{ matrix.arch }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          EVENT_ACTION: ${{ github.event.action }}
         run: |
           set -euo pipefail
 
@@ -69,113 +65,16 @@ jobs:
           if [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
             version="${BASH_REMATCH[1]}"
             asset_version="${version}_beta"
-            channel="${{ inputs.channel || 'beta' }}"
-            if [[ "${{ github.event.action }}" == opentubex-release ]]; then
+            stable=true
+            channel="${INPUT_CHANNEL:-beta}"
+            if [[ "$EVENT_ACTION" == opentubex-release ]]; then
               channel=beta,edge
             fi
           elif [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
             version="${BASH_REMATCH[1]}"
             asset_version="$version"
+            stable=false
             channel=edge
-          else
-            echo "Expected a stable or nightly OpenTubeX tag, got: $tag" >&2
-            exit 1
-          fi
-
-          asset="opentubex_${asset_version}_${TARGET_ARCH}.deb"
-          if ! wget --spider --quiet \
-            "https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/${asset}"; then
-            echo "Release $tag does not contain $asset" >&2
-            exit 1
-          fi
-
-          sed -i -E "s/^version:.*/version: ${version}/" snap/snapcraft.yaml
-          sed -i -E \
-            "s|on amd64: https://github.com/OpenTubeX/OpenTubeX/releases/download/.*|on amd64: https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${asset_version}_amd64.deb|" \
-            snap/snapcraft.yaml
-          sed -i -E \
-            "s|on arm64: https://github.com/OpenTubeX/OpenTubeX/releases/download/.*|on arm64: https://github.com/OpenTubeX/OpenTubeX/releases/download/${tag}/opentubex_${asset_version}_arm64.deb|" \
-            snap/snapcraft.yaml
-          {
-            echo "version=$version"
-            echo "channel=$channel"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Build Snap
-        id: snapcraft
-        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1.3.0
-
-      - name: Upload Snap artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: opentubex-${{ steps.release.outputs.version }}-${{ matrix.arch }}.snap
-          path: ${{ steps.snapcraft.outputs.snap }}
-
-      - name: Check Snap Store credentials
-        if: github.event_name == 'repository_dispatch' || inputs.publish
-        shell: bash
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-        run: |
-          if [[ -z "$SNAPCRAFT_STORE_CREDENTIALS" ]]; then
-            echo "The SNAPCRAFT_STORE_CREDENTIALS repository secret is not configured" >&2
-            exit 1
-          fi
-
-      - name: Publish Snap
-        if: github.event_name == 'repository_dispatch' || inputs.publish
-        shell: bash
-        env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-          SNAP: ${{ steps.snapcraft.outputs.snap }}
-          CHANNEL: ${{ steps.release.outputs.channel }}
-        run: |
-          set -o pipefail
-
-          output_file="$(mktemp)"
-          if snapcraft upload "$SNAP" --release "$CHANNEL" 2>&1 | tee "$output_file"; then
-            exit 0
-          fi
-
-          if grep --fixed-strings --quiet \
-            "Waiting for previous upload(s) to complete their review process." \
-            "$output_file"; then
-            echo "::warning::Snap upload is waiting for the previous upload's store review"
-            exit 0
-          fi
-
-          exit 1
-
-  release:
-    name: Publish GitHub release
-    needs: build
-    runs-on: ubuntu-latest
-
-    permissions:
-      actions: read
-      contents: write
-
-    steps:
-      - name: Resolve release details
-        id: release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          INPUT_TAG: ${{ github.event.client_payload.tag || inputs.releaseTag }}
-        run: |
-          set -euo pipefail
-
-          tag="$INPUT_TAG"
-          if [[ -z "$tag" ]]; then
-            tag="$(gh release view --repo OpenTubeX/OpenTubeX --json tagName --jq .tagName)"
-          fi
-
-          if [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta$ ]]; then
-            version="${BASH_REMATCH[1]}"
-            prerelease=false
-          elif [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly-[0-9]+)$ ]]; then
-            version="${BASH_REMATCH[1]}"
-            prerelease=true
           else
             echo "Expected a stable or nightly OpenTubeX tag, got: $tag" >&2
             exit 1
@@ -184,9 +83,94 @@ jobs:
           {
             echo "tag=$tag"
             echo "version=$version"
-            echo "prerelease=$prerelease"
+            echo "asset_version=$asset_version"
+            echo "channel=$channel"
+            echo "stable=$stable"
           } >> "$GITHUB_OUTPUT"
 
+  build:
+    name: Build ${{ matrix.arch }} Snap
+    needs: resolve
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download OpenTubeX package
+        shell: bash
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
+          VERSION: ${{ needs.resolve.outputs.version }}
+          ASSET: opentubex_${{ needs.resolve.outputs.asset_version }}_${{ matrix.arch }}.deb
+        run: |
+          set -euo pipefail
+          wget --quiet --output-document=opentubex.deb \
+            "https://github.com/OpenTubeX/OpenTubeX/releases/download/${TAG}/${ASSET}"
+          sed -i -E "s/^version:.*/version: ${VERSION}/" snap/snapcraft.yaml
+
+      - name: Build Snap
+        id: snapcraft
+        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1.3.0
+
+      - name: Upload Snap artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: opentubex-${{ needs.resolve.outputs.version }}-${{ matrix.arch }}.snap
+          path: ${{ steps.snapcraft.outputs.snap }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish to the Snap Store
+    needs: [resolve, build]
+    if: github.event_name == 'repository_dispatch' || inputs.publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Snap packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: opentubex-*.snap
+          merge-multiple: true
+
+      - name: Install Snapcraft
+        run: sudo snap install snapcraft --classic
+
+      # A revision that waits for store review is not released; snapcraft fails then.
+      - name: Upload and release
+        shell: bash
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          CHANNEL: ${{ needs.resolve.outputs.channel }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SNAPCRAFT_STORE_CREDENTIALS" ]]; then
+            echo "The SNAPCRAFT_STORE_CREDENTIALS repository secret is not configured" >&2
+            exit 1
+          fi
+          for snap in *.snap; do
+            snapcraft upload "$snap" --release "$CHANNEL"
+          done
+
+  release:
+    name: Publish GitHub release
+    needs: [resolve, build]
+    if: needs.resolve.outputs.stable == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
       - name: Download Snap packages
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -198,9 +182,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ steps.release.outputs.tag }}
-          VERSION: ${{ steps.release.outputs.version }}
-          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
           set -euo pipefail
 
@@ -211,16 +194,11 @@ jobs:
             exit 1
           fi
 
-          install_channel=beta
-          if [[ "$PRERELEASE" == true ]]; then
-            install_channel=edge
-          fi
-
           notes="Snap packages for [OpenTubeX ${TAG}](https://github.com/OpenTubeX/OpenTubeX/releases/tag/${TAG}).
 
           Install from the [Snap Store](https://snapcraft.io/opentubex) with automatic updates:
           \`\`\`bash
-          sudo snap install opentubex --${install_channel}
+          sudo snap install opentubex --beta
           \`\`\`
 
           Or install a downloaded package manually:
@@ -232,16 +210,9 @@ jobs:
 
           Packages installed this way are not connected to the Snap Store and must be updated manually."
 
-          if [[ "$PRERELEASE" == true ]]; then
-            printf -v notes \
-              '> [!WARNING]\n> This nightly build is intended for testing only and may be unstable. Regular users should use the [latest non-prerelease](https://github.com/OpenTubeX/snap/releases/latest).\n\n%s' \
-              "$notes"
-          fi
-
           if release="$(gh api "repos/${GH_REPO}/releases/tags/${TAG}" 2>&1)"; then
             if jq --exit-status '.immutable == true' <<< "$release" >/dev/null; then
-              assets=("${snaps[@]}")
-              for asset in "${assets[@]}"; do
+              for asset in "${snaps[@]}"; do
                 if ! jq --exit-status --arg name "$asset" \
                   'any(.assets[]; .name == $name and .state == "uploaded" and .size > 0)' \
                   <<< "$release" >/dev/null; then
@@ -257,13 +228,8 @@ jobs:
               gh release edit "$TAG" --draft=false
             fi
           elif [[ "$release" == *"(HTTP 404)"* ]]; then
-            release_flags=()
-            if [[ "$PRERELEASE" == true ]]; then
-              release_flags+=(--prerelease)
-            fi
             gh release create "$TAG" "${snaps[@]}" \
               --title "OpenTubeX ${VERSION} (Snap)" \
-              "${release_flags[@]}" \
               --notes "$notes"
           else
             echo "$release" >&2

@@ -8,8 +8,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/publish.yml"
-TAG = "v0.35.2-nightly-1757"
-ASSETS = ["opentubex_0.35.2-nightly-1757_amd64.snap","opentubex_0.35.2-nightly-1757_arm64.snap"]
+TAG = "v0.35.2-beta"
+ASSETS = ["opentubex_0.35.2_amd64.snap", "opentubex_0.35.2_arm64.snap"]
 
 FAKE_GH = """#!/usr/bin/env python3
 import json
@@ -47,7 +47,7 @@ def publish_command():
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
-    def run_publish(self, state, nightly=True):
+    def run_publish(self, state):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             gh = work / "gh"
@@ -63,9 +63,7 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 "GH_CALLS": str(calls),
                 "GH_REPO": "OpenTubeX/snap",
                 "TAG": TAG,
-                "VERSION": "0.35.2-nightly-1757",
-                "CHANNEL": "nightly" if nightly else "stable",
-                "PRERELEASE": "true" if nightly else "false",
+                "VERSION": "0.35.2",
             }
             result = subprocess.run(
                 ["bash", "-c", publish_command()], cwd=work, env=env,
@@ -122,20 +120,14 @@ class ReleaseWorkflowTest(unittest.TestCase):
         ])
         self.assertIn("--draft=false", mutations[1])
 
-    def test_new_nightly_uploads_all_packages_during_creation(self):
+    def test_new_release_uploads_all_packages_during_creation(self):
         result, mutations = self.run_publish({"error": 404})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(mutations), 1)
         self.assertEqual(mutations[0][:2], ["release", "create"])
-        self.assertIn("--prerelease", mutations[0])
+        self.assertNotIn("--prerelease", mutations[0])
         for asset in ASSETS:
             self.assertIn(asset, mutations[0])
-
-    def test_new_stable_release_is_not_a_prerelease(self):
-        result, mutations = self.run_publish({"error": 404}, nightly=False)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(mutations[0][:2], ["release", "create"])
-        self.assertNotIn("--prerelease", mutations[0])
 
     def test_lookup_error_does_not_create_release(self):
         result, mutations = self.run_publish({"error": 403})

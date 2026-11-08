@@ -3,4 +3,5 @@
 parts/
 prime/
 stage/
+*.deb
 __pycache__/

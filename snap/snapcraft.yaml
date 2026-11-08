@@ -1,6 +1,6 @@
 name: opentubex
 title: OpenTubeX
-version: 0.29.0
+version: '0' # Set by the publish workflow
 summary: A private YouTube client
 description: |
   OpenTubeX is an open source desktop YouTube player built with privacy in
@@ -51,9 +51,9 @@ slots:
 parts:
   opentubex:
     plugin: dump
-    source:
-      - on amd64: https://github.com/OpenTubeX/OpenTubeX/releases/download/v$SNAPCRAFT_PROJECT_VERSION-beta/opentubex_$SNAPCRAFT_PROJECT_VERSION_beta_amd64.deb
-      - on arm64: https://github.com/OpenTubeX/OpenTubeX/releases/download/v$SNAPCRAFT_PROJECT_VERSION-beta/opentubex_$SNAPCRAFT_PROJECT_VERSION_beta_arm64.deb
+    # Downloaded by the publish workflow for the release and architecture.
+    source: opentubex.deb
+    source-type: deb
     override-prime: |
       craftctl default
       sed -i \
