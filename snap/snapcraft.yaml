@@ -31,8 +31,6 @@ apps:
     common-id: io.opentubex.opentubex
     desktop: usr/share/applications/opentubex.desktop
     extensions: [gnome]
-    environment:
-      ELECTRON_OZONE_PLATFORM_HINT: auto
     plugs:
       - audio-playback
       - browser-support
@@ -49,10 +47,6 @@ apps:
 slots:
   mpris:
     interface: mpris
-  opentubex:
-    interface: dbus
-    bus: session
-    name: io.opentubex.opentubex
 
 parts:
   deno:
