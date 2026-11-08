@@ -114,7 +114,8 @@ jobs:
           ASSET: opentubex_${{ needs.resolve.outputs.asset_version }}_${{ matrix.arch }}.deb
         run: |
           set -euo pipefail
-          wget --quiet --output-document=opentubex.deb \
+          curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
+            --output opentubex.deb \
             "https://github.com/OpenTubeX/OpenTubeX/releases/download/${TAG}/${ASSET}"
           sed -i -E "s/^version:.*/version: ${VERSION}/" snap/snapcraft.yaml
 
