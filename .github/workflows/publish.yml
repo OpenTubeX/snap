@@ -109,14 +109,14 @@ jobs:
       - name: Download OpenTubeX package
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.resolve.outputs.tag }}
           VERSION: ${{ needs.resolve.outputs.version }}
           ASSET: opentubex_${{ needs.resolve.outputs.asset_version }}_${{ matrix.arch }}.deb
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
-            --output opentubex.deb \
-            "https://github.com/OpenTubeX/OpenTubeX/releases/download/${TAG}/${ASSET}"
+          gh release download "$TAG" --repo OpenTubeX/OpenTubeX \
+            --pattern "$ASSET" --output opentubex.deb
           sed -i -E "s/^version:.*/version: ${VERSION}/" snap/snapcraft.yaml
 
       - name: Build Snap
