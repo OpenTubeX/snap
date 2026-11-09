@@ -42,7 +42,7 @@ release tag. Nightlies are published to `edge`; regular releases are published t
 
 1. downloads the release's `amd64` and `arm64` Debian packages and sets the
    Snap version;
-2. builds both architectures using strict confinement and the Core 24 base;
+2. builds both architectures using strict confinement and the Core 26 base;
 3. uploads both packages to the selected Snap Store channels once both builds
    succeed. If the Snap Store holds a revision for manual review, it is not
    released and the workflow fails;

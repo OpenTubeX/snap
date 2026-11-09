@@ -12,7 +12,7 @@ issues: https://github.com/OpenTubeX/OpenTubeX/issues
 source-code: https://github.com/OpenTubeX/snap
 license: AGPL-3.0-or-later
 
-base: core24
+base: core26
 grade: stable
 confinement: strict
 compression: lzo
