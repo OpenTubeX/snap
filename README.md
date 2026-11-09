@@ -46,10 +46,11 @@ release tag. Nightlies are published to `edge`; regular releases are published t
 3. uploads both packages to the selected Snap Store channels once both builds
    succeed. If the Snap Store holds a revision for manual review, it is not
    released and the workflow fails;
-4. attaches regular-release packages to a GitHub release.
+4. attaches the packages to a GitHub release. Nightlies are prereleases, and
+   only the five newest are kept.
 
 The workflow can also be run manually with a release tag. Manual runs attach
-regular-release packages to a GitHub release and keep both builds as workflow
+the packages to a GitHub release and keep both builds as workflow
 artifacts. Enable the `publish` input to also publish to the Snap Store; regular
 releases use the selected channel and nightlies use `edge`.
 

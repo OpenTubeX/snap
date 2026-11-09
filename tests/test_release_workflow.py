@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/publish.yml"
 TAG = "v0.35.2-beta"
 ASSETS = ["opentubex_0.35.2_amd64.snap", "opentubex_0.35.2_arm64.snap"]
+NIGHTLY_TAG = "v0.35.2-nightly-1757"
+NIGHTLY_ASSETS = ["opentubex_0.35.2-nightly-1757_amd64.snap", "opentubex_0.35.2-nightly-1757_arm64.snap"]
 
 FAKE_GH = """#!/usr/bin/env python3
 import json
@@ -36,9 +38,29 @@ elif args[:2] not in (["release", "upload"], ["release", "create"], ["release", 
 """
 
 
+PRUNE_GH = """#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import sys
+
+args = sys.argv[1:]
+with Path(os.environ["GH_CALLS"]).open("a") as calls:
+    calls.write(json.dumps(args) + "\\n")
+if args[:2] == ["release", "list"]:
+    print(os.environ["RELEASES"])
+elif args[:2] != ["release", "delete"]:
+    sys.exit(f"Unexpected gh call: {args}")
+"""
+
+
 def publish_command():
+    return step_command("Create or update GitHub release")
+
+
+def step_command(name):
     lines = WORKFLOW.read_text().splitlines()
-    start = lines.index("      - name: Create or update GitHub release")
+    start = lines.index(f"      - name: {name}")
     start = lines.index("        run: |", start) + 1
     end = start
     while end < len(lines) and (not lines[end].strip() or lines[end].startswith("          ")):
@@ -47,13 +69,13 @@ def publish_command():
 
 
 class ReleaseWorkflowTest(unittest.TestCase):
-    def run_publish(self, state):
+    def run_publish(self, state, stable=True):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             gh = work / "gh"
             gh.write_text(FAKE_GH)
             gh.chmod(0o755)
-            for asset in ASSETS:
+            for asset in ASSETS if stable else NIGHTLY_ASSETS:
                 (work / asset).write_bytes(b"rebuilt package with different bytes")
             calls = work / "calls.jsonl"
             env = {
@@ -62,8 +84,9 @@ class ReleaseWorkflowTest(unittest.TestCase):
                 "GH_STATE": json.dumps(state),
                 "GH_CALLS": str(calls),
                 "GH_REPO": "OpenTubeX/snap",
-                "TAG": TAG,
-                "VERSION": "0.35.2",
+                "TAG": TAG if stable else NIGHTLY_TAG,
+                "VERSION": "0.35.2" if stable else "0.35.2-nightly-1757",
+                "STABLE": str(stable).lower(),
             }
             result = subprocess.run(
                 ["bash", "-c", publish_command()], cwd=work, env=env,
@@ -128,6 +151,39 @@ class ReleaseWorkflowTest(unittest.TestCase):
         self.assertNotIn("--prerelease", mutations[0])
         for asset in ASSETS:
             self.assertIn(asset, mutations[0])
+
+    def test_new_nightly_is_a_prerelease_installed_from_edge(self):
+        result, mutations = self.run_publish({"error": 404}, stable=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(mutations), 1)
+        self.assertEqual(mutations[0][:2], ["release", "create"])
+        self.assertIn("--prerelease", mutations[0])
+        notes = mutations[0][mutations[0].index("--notes") + 1]
+        self.assertIn("nightly build is intended for testing", notes)
+        self.assertIn("sudo snap install opentubex --edge", notes)
+        for asset in NIGHTLY_ASSETS:
+            self.assertIn(asset, mutations[0])
+
+    def test_prune_keeps_the_newest_nightlies_and_all_stable_releases(self):
+        releases = [{"tagName": "v0.35.2-beta", "isPrerelease": False, "createdAt": "2026-01-01T00:00:00Z"}]
+        releases += [
+            {"tagName": f"v0.35.2-nightly-{n}", "isPrerelease": True, "createdAt": f"2026-01-{n:02d}T02:30:00Z"}
+            for n in range(1, 9)
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            calls = work / "calls.jsonl"
+            gh = work / "gh"
+            gh.write_text(PRUNE_GH)
+            gh.chmod(0o755)
+            env = {**os.environ, "PATH": f"{work}:{os.environ['PATH']}", "GH_CALLS": str(calls),
+                   "RELEASES": json.dumps(releases), "GH_REPO": "OpenTubeX/snap", "KEEP": "5"}
+            result = subprocess.run(["bash", "-c", step_command("Prune old nightly releases")],
+                                    cwd=work, env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            deleted = [args[2] for args in map(json.loads, calls.read_text().splitlines())
+                       if args[:2] == ["release", "delete"]]
+        self.assertEqual(deleted, ["v0.35.2-nightly-3", "v0.35.2-nightly-2", "v0.35.2-nightly-1"])
 
     def test_lookup_error_does_not_create_release(self):
         result, mutations = self.run_publish({"error": 403})

@@ -165,7 +165,6 @@ jobs:
   release:
     name: Publish GitHub release
     needs: [resolve, build]
-    if: needs.resolve.outputs.stable == 'true'
     runs-on: ubuntu-latest
 
     permissions:
@@ -185,6 +184,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.resolve.outputs.tag }}
           VERSION: ${{ needs.resolve.outputs.version }}
+          STABLE: ${{ needs.resolve.outputs.stable }}
         run: |
           set -euo pipefail
 
@@ -195,11 +195,16 @@ jobs:
             exit 1
           fi
 
+          install_channel=beta
+          if [[ "$STABLE" != true ]]; then
+            install_channel=edge
+          fi
+
           notes="Snap packages for [OpenTubeX ${TAG}](https://github.com/OpenTubeX/OpenTubeX/releases/tag/${TAG}).
 
           Install from the [Snap Store](https://snapcraft.io/opentubex) with automatic updates:
           \`\`\`bash
-          sudo snap install opentubex --beta
+          sudo snap install opentubex --${install_channel}
           \`\`\`
 
           Or install a downloaded package manually:
@@ -210,6 +215,12 @@ jobs:
           \`\`\`
 
           Packages installed this way are not connected to the Snap Store and must be updated manually."
+
+          if [[ "$STABLE" != true ]]; then
+            printf -v notes \
+              '> [!WARNING]\n> This nightly build is intended for testing only and may be unstable. Regular users should use the [latest non-prerelease](https://github.com/OpenTubeX/snap/releases/latest).\n\n%s' \
+              "$notes"
+          fi
 
           if release="$(gh api "repos/${GH_REPO}/releases/tags/${TAG}" 2>&1)"; then
             if jq --exit-status '.immutable == true' <<< "$release" >/dev/null; then
@@ -229,10 +240,32 @@ jobs:
               gh release edit "$TAG" --draft=false
             fi
           elif [[ "$release" == *"(HTTP 404)"* ]]; then
+            release_flags=()
+            if [[ "$STABLE" != true ]]; then
+              release_flags+=(--prerelease)
+            fi
             gh release create "$TAG" "${snaps[@]}" \
               --title "OpenTubeX ${VERSION} (Snap)" \
+              "${release_flags[@]}" \
               --notes "$notes"
           else
             echo "$release" >&2
             exit 1
           fi
+
+      - name: Prune old nightly releases
+        if: needs.resolve.outputs.stable != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          KEEP: 5
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GH_REPO" --limit 1000 --json tagName,isPrerelease,createdAt |
+            jq -r --argjson keep "$KEEP" '
+              [.[] | select(.isPrerelease and (.tagName | test("-nightly-[0-9]+$")))]
+              | sort_by(.createdAt) | reverse | .[$keep:][].tagName' |
+            while read -r tag; do
+              gh release delete "$tag" --repo "$GH_REPO" --cleanup-tag --yes
+            done
