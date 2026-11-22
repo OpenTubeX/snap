@@ -31,6 +31,11 @@ apps:
     common-id: io.opentubex.opentubex
     desktop: usr/share/applications/opentubex.desktop
     extensions: [gnome]
+    environment:
+      # On GNOME, Chromium passes the tray icon to the shell as a file in a
+      # temporary directory. The shell cannot read the snap's private /tmp and
+      # shows a placeholder, but it can read the snap's runtime directory.
+      TMPDIR: $XDG_RUNTIME_DIR
     plugs:
       - audio-playback
       - browser-support
